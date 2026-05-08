@@ -1,5 +1,6 @@
 """FastAPI 应用入口。"""
 
+import json
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -82,6 +83,42 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _should_strip_empty_meta(path: str) -> bool:
+    """兼容旧 Studio 路由的响应壳契约：这些端点历史上不返回 meta 字段。"""
+    return (
+        path == "/health"
+        or path.startswith("/api/v1/studio/prompts")
+        or path.startswith("/api/v1/studio/entities")
+        or path.startswith("/api/v1/studio/files")
+        or path.startswith("/api/v1/studio/shot-character-links")
+    )
+
+
+@app.middleware("http")
+async def strip_legacy_empty_meta(request: Request, call_next):  # noqa: ANN001
+    response = await call_next(request)
+    content_type = response.headers.get("content-type", "")
+    if not _should_strip_empty_meta(request.url.path) or "application/json" not in content_type:
+        return response
+
+    body = b""
+    async for chunk in response.body_iterator:
+        body += chunk
+    try:
+        payload = json.loads(body.decode("utf-8")) if body else None
+    except json.JSONDecodeError:
+        return JSONResponse(status_code=response.status_code, content=body.decode("utf-8"))
+    if isinstance(payload, dict) and payload.get("meta") is None:
+        payload.pop("meta", None)
+    headers = {
+        key: value
+        for key, value in response.headers.items()
+        if key.lower() not in {"content-length", "content-type"}
+    }
+    return JSONResponse(status_code=response.status_code, content=payload, headers=headers)
+
 
 app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
 # 影视技能路由同时挂到主应用，保证 /api/v1/film 一定可访问

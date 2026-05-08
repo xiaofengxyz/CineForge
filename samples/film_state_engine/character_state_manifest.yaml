@@ -1,0 +1,24 @@
+film_state:
+  scene_id: rooftop_confession_v1
+  timeline:
+    time_of_day: night
+    weather: calm
+  characters:
+    heroine_001:
+      outfit: evening_gown
+      hair: loose_waves
+      emotion: vulnerable
+      continuity_notes:
+        - maintain soft makeup across shots
+        - keep hair placement consistent with breeze
+    hero_001:
+      outfit: suit_black
+      emotion: conflicted
+      continuity_notes:
+        - preserve eye contact direction
+        - avoid sudden expression shifts
+
+state_rules:
+  - continuity: character_emotion
+  - continuity: lighting_match
+  - continuity: outfit_persistence

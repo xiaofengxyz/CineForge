@@ -1,0 +1,9 @@
+scene:
+  mood: suspense
+  pacing: slow
+
+shots:
+  - framing: wide
+    movement: slow_push
+    lens: 35mm
+    emotion: nervous

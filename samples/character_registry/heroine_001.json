@@ -1,0 +1,9 @@
+{
+  "id": "heroine_001",
+  "base_model": "flux",
+  "lora": "heroine_v12.safetensors",
+  "seed": 12345,
+  "outfits": [
+    "school_uniform"
+  ]
+}

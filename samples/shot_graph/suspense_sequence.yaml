@@ -1,0 +1,43 @@
+sequence_id: suspense_corridor_v1
+
+scene:
+  location: dark_corridor
+  mood: suspense
+  lighting: low_key
+
+characters:
+  - heroine_001
+
+shots:
+  - id: shot_001
+    type: hallway_wide
+    duration: 5
+    movement: slow_dolly
+
+  - id: shot_002
+    type: over_shoulder
+    duration: 4
+    movement: handheld_subtle
+
+  - id: shot_003
+    type: extreme_closeup
+    duration: 2
+    target: eyes
+
+  - id: shot_004
+    type: reveal_shot
+    duration: 2
+    movement: sudden_pan
+
+transitions:
+  - from: shot_001
+    to: shot_002
+    type: suspense_cut
+
+  - from: shot_002
+    to: shot_003
+    type: tension_push
+
+  - from: shot_003
+    to: shot_004
+    type: jump_reveal

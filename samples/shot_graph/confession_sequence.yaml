@@ -1,0 +1,50 @@
+sequence_id: confession_scene_v1
+
+scene:
+  location: rooftop_night
+  mood: emotional
+  lighting: cinematic_blue
+  weather: light_wind
+
+characters:
+  - heroine_001
+  - hero_001
+
+shots:
+  - id: shot_001
+    type: establishing_wide
+    duration: 4
+    movement: slow_push
+    emotion: nervous
+
+  - id: shot_002
+    type: medium_two_shot
+    duration: 5
+    movement: static
+    emotion: hesitation
+
+  - id: shot_003
+    type: closeup
+    target: heroine_001
+    duration: 4
+    movement: dolly_in
+    emotion: emotional
+
+  - id: shot_004
+    type: reaction_closeup
+    target: hero_001
+    duration: 3
+    emotion: surprised
+
+transitions:
+  - from: shot_001
+    to: shot_002
+    type: cut
+
+  - from: shot_002
+    to: shot_003
+    type: slow_dissolve
+
+  - from: shot_003
+    to: shot_004
+    type: reaction_cut

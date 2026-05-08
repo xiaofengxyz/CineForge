@@ -1,0 +1,18 @@
+prompt:
+  model: kling
+  scene:
+    mood: suspense
+    lighting: low_key
+    environment: dark_corridor
+  character_state:
+    heroine:
+      outfit: leather_coat
+      emotion: anxious
+  shot:
+    framing: extreme_closeup
+    movement: slow_dolly
+    focus: eyes
+
+compiler_notes:
+  - preserve scene tone and character continuity
+  - generate prompts for backend-specific runtime

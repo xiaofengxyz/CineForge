@@ -18,6 +18,33 @@ DEFAULT_RATIO_TO_SIZE_MAPPING: dict[str, str] = {
 }
 
 
+def infer_ratio_from_size(value: str | None) -> str | None:
+    """Infer a supported video ratio from a ratio string or WIDTHxHEIGHT value."""
+    raw = (value or "").strip().lower().replace("*", "x")
+    if raw in ALLOWED_RATIOS:
+        return raw
+    if "x" not in raw:
+        return None
+    left, right = raw.split("x", 1)
+    try:
+        width = int(left)
+        height = int(right)
+    except ValueError:
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    candidates = {
+        "16:9": 16 / 9,
+        "4:3": 4 / 3,
+        "1:1": 1,
+        "3:4": 3 / 4,
+        "9:16": 9 / 16,
+        "21:9": 21 / 9,
+    }
+    actual = width / height
+    return min(candidates, key=lambda ratio: abs(candidates[ratio] - actual))
+
+
 @dataclass(frozen=True, slots=True)
 class VideoModelCapability:
     """供应商/模型能力约束。"""

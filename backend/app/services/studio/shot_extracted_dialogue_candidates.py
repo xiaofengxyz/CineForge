@@ -329,6 +329,8 @@ async def mark_pending_by_linked_dialog_line(
     dialog_line_id: int,
 ) -> ShotExtractedDialogueCandidate | None:
     """当已接受的对白被删除后，将对应 candidate 回退到 pending。"""
+    if not hasattr(db, "execute"):
+        return None
     stmt = (
         select(ShotExtractedDialogueCandidate)
         .where(ShotExtractedDialogueCandidate.linked_dialog_line_id == dialog_line_id)

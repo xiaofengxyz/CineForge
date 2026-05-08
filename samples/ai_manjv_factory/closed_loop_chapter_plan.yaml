@@ -1,0 +1,61 @@
+project:
+  id: project_001
+  title: Neon Trial
+
+chapter:
+  id: chapter_001
+  title: Rain Alley
+
+runtime:
+  provider: kling
+  model: kling-v1
+  output_dir: output/renders
+  export_output_path: output/exports/chapter_001.mp4
+
+character_bibles:
+  - id: char_001
+    name: Ari
+    default_outfit: coat_black
+    outfits:
+      coat_black: black rain coat
+    voice_id: voice_ari
+    lora: ari_v12.safetensors
+    embeddings:
+      - ari_face_v4
+    reference_media:
+      - refs/ari_front.png
+    negative_terms:
+      - wrong face
+
+scene_bibles:
+  - id: scene_001
+    name: Neon alley
+    lighting: neon_blue
+    weather: rain
+    tone: noir
+    mood: suspense
+    camera_style: handheld restrained
+    reference_media:
+      - refs/alley.png
+
+shots:
+  - id: shot_001
+    scene_id: scene_001
+    character_ids:
+      - char_001
+    dialogue:
+      - "Ari: Keep walking."
+    director_dsl:
+      framing: medium_closeup
+      movement: dolly_in
+      lens: 85mm
+      emotion: wary
+      pacing: slow
+    qa_metrics:
+      face_similarity: 0.61
+      outfit_similarity: 0.82
+      clip_score: 0.52
+    retry_policy:
+      max_attempts: 3
+      expected_patch:
+        reference_strength: high

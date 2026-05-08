@@ -31,7 +31,7 @@ class VideoGenerationInput(BaseModel):
     key_frame_base64: Optional[str] = Field(None, description="关键帧图：纯 base64 或 data URL")
 
     model: Optional[str] = Field(None, description="视频模型名称（可选，供应商透传）")
-    ratio: VideoRatio = Field(..., description="视频宽高比，业务层唯一主参数")
+    ratio: VideoRatio = Field("16:9", description="视频宽高比，业务层唯一主参数")
     seconds: Optional[int] = Field(None, description="时长（秒）（可选，供应商透传）")
     seed: Optional[int] = Field(
         None,

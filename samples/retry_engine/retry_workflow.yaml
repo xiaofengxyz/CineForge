@@ -1,0 +1,18 @@
+retry_workflow:
+  sequence_id: alley_fight_v1
+  stage: retry
+  original_generation:
+    model: seedance
+    shot_id: shot_002
+    issue: motion_blur_artifact
+  qa_result:
+    status: fail
+    failure_type: image_quality
+  repair_strategy:
+    - action: adjust_prompt
+      detail: increase_clarity
+    - action: reduce_motion_blur
+      detail: lower_shutter_speed
+  retry_policy:
+    max_attempts: 3
+    backoff: exponential

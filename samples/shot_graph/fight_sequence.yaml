@@ -1,0 +1,45 @@
+sequence_id: alley_fight_v1
+
+scene:
+  location: rainy_alley
+  mood: aggressive
+  lighting: neon_red
+
+characters:
+  - hero_001
+  - villain_001
+
+shots:
+  - id: shot_001
+    type: handheld_wide
+    duration: 3
+    movement: shaky_follow
+    pacing: fast
+
+  - id: shot_002
+    type: impact_closeup
+    duration: 1.5
+    movement: whip_pan
+
+  - id: shot_003
+    type: tracking_shot
+    duration: 4
+    movement: side_tracking
+
+  - id: shot_004
+    type: slow_motion_finish
+    duration: 3
+    movement: arc_orbit
+
+transitions:
+  - from: shot_001
+    to: shot_002
+    type: hard_cut
+
+  - from: shot_002
+    to: shot_003
+    type: motion_match
+
+  - from: shot_003
+    to: shot_004
+    type: speed_ramp

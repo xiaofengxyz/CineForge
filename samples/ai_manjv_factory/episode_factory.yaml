@@ -1,0 +1,57 @@
+series:
+  id: series_demo_001
+  title: Reborn Heiress
+  production_mode: industrial_batch
+
+assets:
+  characters:
+    - id: heroine_001
+      name: Lin Xia
+      continuity:
+        outfit: white blazer, pearl earrings
+        voice_id: cosyvoice_lin_xia
+        references:
+          - uploads/lin_xia_ref.png
+    - id: rival_001
+      name: Shen Yue
+      continuity:
+        outfit: black dress, silver necklace
+        voice_id: fish_speech_shen_yue
+        references:
+          - uploads/shen_yue_ref.png
+  scenes:
+    - id: office_night_001
+      name: Night Office
+      lighting: cool neon with warm desk lamp contrast
+      mood: tense
+
+episode:
+  id: ep_001
+  story_goal: The heroine discovers the forged contract.
+  shots:
+    - id: shot_001
+      scene_id: office_night_001
+      character_ids: [heroine_001]
+      director_dsl:
+        framing: medium_closeup
+        movement: slow_dolly_in
+        lens: 85mm
+        emotion: suspicion
+        pacing: slow
+      qa_targets:
+        face_similarity: 0.82
+        outfit_similarity: 0.78
+        clip_score: 0.30
+    - id: shot_002
+      scene_id: office_night_001
+      character_ids: [heroine_001, rival_001]
+      director_dsl:
+        framing: over_the_shoulder
+        movement: locked_off
+        lens: 50mm
+        emotion: confrontation
+        pacing: medium
+      qa_targets:
+        face_similarity: 0.80
+        outfit_similarity: 0.76
+        clip_score: 0.28

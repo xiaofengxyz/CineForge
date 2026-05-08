@@ -1,0 +1,18 @@
+scene:
+  id: cinematic_night_street_v1
+  location: neon_alley
+  mood: tense
+  lighting: low_key_blue
+  weather: light_rain
+  tone: gritty
+  camera_style: handheld
+
+assets:
+  props:
+    - wet_pavement
+    - neon_signs
+    - steam
+
+notes:
+  - maintain consistent night lighting across shots
+  - use rain reflections for depth

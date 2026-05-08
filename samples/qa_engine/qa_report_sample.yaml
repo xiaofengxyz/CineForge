@@ -1,0 +1,19 @@
+qa_report:
+  scene_id: suspense_corridor_v1
+  shot_id: shot_003
+  checks:
+    - type: face_drift
+      status: pass
+      confidence: 0.92
+    - type: anatomy_integrity
+      status: fail
+      issue: hand_count_mismatch
+    - type: outfit_consistency
+      status: pass
+    - type: lighting_consistency
+      status: warn
+      note: shadow_direction_variance
+
+summary:
+  status: review_required
+  recommended_action: retry_with_repair
