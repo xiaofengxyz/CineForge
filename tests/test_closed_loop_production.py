@@ -124,6 +124,7 @@ def test_closed_loop_plan_compiles_render_requests_qa_and_retry_requests():
     assert plan.qa_passed is False
     assert plan.metadata["retry_count"] == 1
     assert plan.shot_plans[0].qa_report.issues[0].code == "low_face_similarity"
+    assert plan.as_dict()["qa"]["reports"][0]["metrics"]["face_similarity"] == 0.61
     assert plan.retry_requests[0].parameters["reference_strength"] == "high"
     assert plan.retry_requests[0].parameters["retry_attempt"] == 2
     assert "Increase reference strength for face_similarity." in plan.retry_requests[0].prompt
@@ -164,3 +165,50 @@ def test_closed_loop_plan_adds_post_production_when_render_results_exist():
         "export",
     ]
     assert plan.post_production_plan.output_path == "output/exports/chapter_001.mp4"
+
+
+def test_closed_loop_plan_respects_configured_qa_threshold_and_retry_limit():
+    project, chapter, assets, character_bibles, scene_bibles, shots = _fixture()
+
+    plan = ClosedLoopProductionPlanner().plan_chapter(
+        project=project,
+        chapter=chapter,
+        shots=shots,
+        assets=assets,
+        character_bibles=character_bibles,
+        scene_bibles=scene_bibles,
+        provider="kling",
+        model="kling-v1",
+        output_dir="output/renders",
+        qa_threshold=0.95,
+        retry_limit=1,
+        qa_metrics_by_shot={
+            "shot_001": {"face_similarity": 0.90, "outfit_similarity": 0.90, "clip_score": 0.90},
+            "shot_002": {"face_similarity": 0.60, "outfit_similarity": 0.60, "clip_score": 0.60},
+        },
+    )
+
+    assert plan.qa_passed is False
+    assert len(plan.retry_requests) == 1
+    assert plan.retry_requests[0].shot_id == "shot_001"
+
+
+def test_closed_loop_plan_can_disable_auto_retry():
+    project, chapter, assets, character_bibles, scene_bibles, shots = _fixture()
+
+    plan = ClosedLoopProductionPlanner().plan_chapter(
+        project=project,
+        chapter=chapter,
+        shots=shots,
+        assets=assets,
+        character_bibles=character_bibles,
+        scene_bibles=scene_bibles,
+        provider="kling",
+        model="kling-v1",
+        output_dir="output/renders",
+        qa_metrics_by_shot={"shot_001": {"face_similarity": 0.20}},
+        auto_retry=False,
+    )
+
+    assert plan.qa_passed is False
+    assert plan.retry_requests == []

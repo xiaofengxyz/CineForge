@@ -489,7 +489,7 @@ class QAReport:
 
 
 class QAEngine:
-    thresholds = {
+    default_thresholds = {
         "face_similarity": 0.75,
         "outfit_similarity": 0.70,
         "lighting_similarity": 0.60,
@@ -502,6 +502,20 @@ class QAEngine:
         "lighting_similarity": "lighting_mismatch",
         "clip_score": "weak_prompt_alignment",
     }
+
+    def __init__(
+        self,
+        *,
+        thresholds: dict[str, float] | None = None,
+        default_threshold: float | None = None,
+    ) -> None:
+        if thresholds is not None:
+            self.thresholds = dict(thresholds)
+        elif default_threshold is not None:
+            value = max(0.0, min(1.0, float(default_threshold)))
+            self.thresholds = {metric: value for metric in self.default_thresholds}
+        else:
+            self.thresholds = dict(self.default_thresholds)
 
     def evaluate(self, *, shot_id: str, metrics: dict[str, float] | None = None) -> QAReport:
         metrics = dict(metrics or {})
@@ -616,6 +630,7 @@ class ClosedLoopProductionPlan:
                         "shot_id": item.qa_report.shot_id,
                         "passed": item.qa_report.passed,
                         "score": item.qa_report.score,
+                        "metrics": dict(item.qa_report.metrics),
                         "issues": [issue.__dict__ for issue in item.qa_report.issues],
                     }
                     for item in self.shot_plans
@@ -662,11 +677,16 @@ class ClosedLoopProductionPlanner:
         qa_metrics_by_shot: dict[str, dict[str, float]] | None = None,
         render_results: list[RenderResult] | None = None,
         export_output_path: str | None = None,
+        qa_threshold: float | None = None,
+        auto_retry: bool = True,
+        retry_limit: int | None = None,
     ) -> ClosedLoopProductionPlan:
         workflow = self.bridge.build_chapter_workflow(project, chapter, shots)
         shot_plans: list[ShotPlan] = []
         render_requests: list[RenderRequest] = []
         retry_requests: list[RetryRequest] = []
+        qa_engine = QAEngine(default_threshold=qa_threshold) if qa_threshold is not None else self.qa
+        effective_retry_limit = max(0, retry_limit) if retry_limit is not None else None
 
         for shot in sorted(shots, key=lambda item: item.index):
             continuity = self.bridge.shot_to_continuity(shot, assets=assets)
@@ -689,8 +709,11 @@ class ClosedLoopProductionPlanner:
                 output_path=output_path,
             )
             metrics = (qa_metrics_by_shot or {}).get(shot.id)
-            qa_report = self.qa.evaluate(shot_id=shot.id, metrics=metrics)
-            retry_request = self.retry.build_retry_request(report=qa_report, compiled_prompt=compiled)
+            qa_report = qa_engine.evaluate(shot_id=shot.id, metrics=metrics)
+            retry_request = None
+            can_retry = auto_retry and (effective_retry_limit is None or len(retry_requests) < effective_retry_limit)
+            if can_retry:
+                retry_request = self.retry.build_retry_request(report=qa_report, compiled_prompt=compiled)
             if retry_request is not None:
                 retry_requests.append(retry_request)
             render_requests.append(render_request)
@@ -732,7 +755,9 @@ class ClosedLoopProductionPlanner:
                 "retry_count": len(retry_requests),
                 "provider": provider,
                 "model": model,
+                "qa_threshold": qa_threshold,
+                "auto_retry": auto_retry,
+                "retry_limit": retry_limit,
             },
             post_production_plan=post_plan,
         )
-

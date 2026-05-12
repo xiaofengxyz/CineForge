@@ -21,6 +21,7 @@ import type { TableColumnsType } from 'antd'
 import {
   ArrowLeftOutlined,
   CloseCircleOutlined,
+  ClusterOutlined,
   DeleteOutlined,
   EditOutlined,
   FileSearchOutlined,
@@ -563,6 +564,12 @@ export function ChapterShotsPage() {
 
         {shots.length > 0 ? (
           <Space>
+            <Button
+              icon={<ClusterOutlined />}
+              onClick={() => navigate(`/projects/${projectId}?tab=film-engine&chapter=${chapterId}`)}
+            >
+              Film Engine
+            </Button>
             <Button
               type="primary"
               icon={<FileSearchOutlined />}

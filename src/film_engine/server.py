@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from .demo import build_demo_plan_summary
 from .jellyfish_base import inspect_jellyfish_base
 from .studio import build_stage_index, build_studio_status
+from .text_to_drama import TextToDramaConfig, TextToDramaPipeline
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -28,12 +29,35 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(404)
         self.end_headers()
 
+    def do_POST(self) -> None:  # noqa: N802
+        if self.path == "/api/text-to-drama/run":
+            try:
+                payload = self._read_json_body()
+                source_text = str(payload.get("source_text") or payload.get("text") or "").strip()
+                config = TextToDramaConfig.from_mapping(dict(payload.get("config") or payload))
+                result = TextToDramaPipeline().run(source_text, config=config)
+            except Exception as exc:  # noqa: BLE001
+                self._json({"status": "failed", "error": str(exc)}, status_code=400)
+                return
+            self._json(result)
+            return
+        self.send_response(404)
+        self.end_headers()
+
     def log_message(self, format: str, *args: object) -> None:
         return
 
-    def _json(self, payload: dict[str, object]) -> None:
+    def _read_json_body(self) -> dict[str, object]:
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length > 0 else b"{}"
+        if not raw:
+            return {}
+        data = json.loads(raw.decode("utf-8"))
+        return data if isinstance(data, dict) else {}
+
+    def _json(self, payload: dict[str, object], *, status_code: int = 200) -> None:
         raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
-        self.send_response(200)
+        self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
@@ -64,4 +88,3 @@ def _dashboard_html() -> str:
   </main>
 </body>
 </html>"""
-

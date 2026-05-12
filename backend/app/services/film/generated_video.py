@@ -16,7 +16,7 @@ from app.core.contracts.video_generation import VideoGenerationInput, VideoGener
 from app.core.tasks import VideoGenerationTask
 from app.models.llm import Model, ModelCategoryKey, ModelSettings
 from app.models.task_links import GenerationTaskLink
-from app.models.studio import FileItem, Shot, ShotDetail, ShotFrameType
+from app.models.studio import CharacterImage, FileItem, Shot, ShotCharacterLink, ShotDetail, ShotFrameType
 from app.models.types import FileUsageKind
 from app.services.common import entity_not_found
 from app.services.llm.provider_resolver import resolve_provider_config_by_model
@@ -28,6 +28,7 @@ from app.services.studio.generation.video import (
     build_video_submission_payload,
     validate_images_count,
 )
+from app.services.film.visual_qa import evaluate_file_item_with_film_visual_qa
 from app.services.studio.shot_status import recompute_shot_status
 from app.services.worker.async_task_support import cancel_if_requested_async
 from app.services.worker.task_logging import log_task_event, log_task_failure
@@ -143,6 +144,36 @@ async def resolve_effective_video_options(
     return req_ratio
 
 
+async def _character_reference_file_ids_for_shot(
+    db: AsyncSession,
+    *,
+    shot_id: str,
+) -> dict[str, list[str]]:
+    """Collect character reference images so InsightFace can check identity drift."""
+    link_stmt = (
+        select(ShotCharacterLink)
+        .where(ShotCharacterLink.shot_id == shot_id)
+        .order_by(ShotCharacterLink.index)
+    )
+    character_ids = [row.character_id for row in (await db.execute(link_stmt)).scalars().all()]
+    if not character_ids:
+        return {}
+    image_stmt = (
+        select(CharacterImage)
+        .where(CharacterImage.character_id.in_(character_ids))
+        .order_by(CharacterImage.is_primary.desc(), CharacterImage.id)
+    )
+    refs_by_character: dict[str, list[str]] = {character_id: [] for character_id in character_ids}
+    for row in (await db.execute(image_stmt)).scalars().all():
+        if row.file_id:
+            refs_by_character.setdefault(row.character_id, []).append(row.file_id)
+    return {
+        character_id: refs
+        for character_id, refs in refs_by_character.items()
+        if refs
+    }
+
+
 async def build_run_args(
     db: AsyncSession,
     *,
@@ -152,6 +183,7 @@ async def build_run_args(
     images: list[str],
     ratio: str | None,
 ) -> dict:
+    """Build provider run arguments and Film Engine QA context for one shot."""
     model = await resolve_default_video_model(db)
     provider_cfg = await load_provider_config_by_model(db, model)
     shot_detail = await validate_shot_and_duration(db, shot_id)
@@ -185,6 +217,18 @@ async def build_run_args(
             "last_frame_base64": frame_map.get(ShotFrameType.last),
             "key_frame_base64": frame_map.get(ShotFrameType.key),
             "model": model.name,
+            "ratio": resolved_ratio,
+            "seconds": shot_detail.duration,
+        },
+        "film_engine_qa_context": {
+            "evaluator": "film_visual_qa",
+            "reference_file_ids": list(submission.images),
+            "character_reference_file_ids_by_id": await _character_reference_file_ids_for_shot(
+                db,
+                shot_id=shot_id,
+            ),
+            "reference_mode": reference_mode,
+            "prompt": final_prompt,
             "ratio": resolved_ratio,
             "seconds": shot_detail.duration,
         },
@@ -254,6 +298,7 @@ async def run_video_generation_task(
     task_id: str,
     run_args: dict,
 ) -> None:
+    """Execute one video task and attach best-effort Film Visual QA metrics."""
     async with async_session_maker() as session:
         try:
             store = SqlAlchemyTaskStore(session)
@@ -306,6 +351,34 @@ async def run_video_generation_task(
 
             result_payload = result.model_dump()
             result_payload["file_id"] = file_obj.id
+            qa_context = run_args.get("film_engine_qa_context")
+            reference_file_ids = []
+            if isinstance(qa_context, dict):
+                reference_file_ids = [
+                    str(item)
+                    for item in qa_context.get("reference_file_ids", [])
+                    if str(item).strip()
+                ]
+            # Film Visual QA is external evidence. It enriches reports, but
+            # generation success should remain recoverable if analysis fails.
+            visual_qa = await evaluate_file_item_with_film_visual_qa(
+                session,
+                video_file=file_obj,
+                reference_file_ids=reference_file_ids,
+                character_reference_file_ids_by_id=(
+                    qa_context.get("character_reference_file_ids_by_id", {})
+                    if isinstance(qa_context, dict)
+                    else {}
+                ),
+                prompt_text=(
+                    str(qa_context.get("prompt") or "")
+                    if isinstance(qa_context, dict)
+                    else str(input_dict.get("prompt") or "")
+                ),
+            )
+            result_payload["film_engine_visual_qa"] = visual_qa.as_result_payload()
+            if visual_qa.metrics:
+                result_payload["film_engine_qa_metrics"] = dict(visual_qa.metrics)
             await store.set_result(task_id, result_payload)
             if await cancel_if_requested_async(store=store, task_id=task_id, session=session):
                 log_task_event("video_generation", task_id, "cancelled", stage="after_persist")

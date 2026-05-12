@@ -47,20 +47,39 @@ def test_stage_index_uses_artifacts_as_completion_evidence():
         "render_requests": [
             {
                 "model": "kling",
-                "prompt": "shot=s1; outfits=char:coat",
+                "prompt": "shot=s1; framing=MS; movement=DOLLY_IN; lens=35mm; emotion=tense; lighting=neon; mood=suspense; outfits=char:coat",
                 "references": ["ref.png"],
+                "parameters": {
+                    "negative_prompt": "wrong face",
+                    "continuity": {
+                        "outfit_map": {"char": "coat"},
+                        "emotion_map": {"char": "tense"},
+                        "lighting": "neon",
+                    },
+                },
             }
         ],
         "retry_requests": [{"shot_id": "s1"}],
-        "qa": {"passed": False},
+        "qa": {
+            "passed": False,
+            "reports": [
+                {
+                    "shot_id": "s1",
+                    "passed": False,
+                    "score": 0.5,
+                    "issues": [{"code": "low_face_similarity"}],
+                }
+            ],
+        },
         "post_production": {"enabled": True},
     }
 
     stages = build_stage_index(summary)
 
     assert [stage.status for stage in stages] == ["done"] * 9
-    assert stages[0].owner == "Jellyfish"
-    assert stages[-1].evidence == "Post-production enabled=True."
+    assert stages[0].owner == "Runtime"
+    assert stages[-1].id == "film_state_engine"
+    assert stages[-1].evidence == "Continuity parameters travel with every compiled render request."
 
 
 def test_industrial_review_marks_base_blocked_when_jellyfish_missing(tmp_path: Path):

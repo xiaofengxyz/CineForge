@@ -2,20 +2,30 @@ from __future__ import annotations
 
 import json
 import threading
-from urllib.request import urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 from src.film_engine.demo import build_demo_plan_summary
 from src.film_engine.server import create_server
 
 
+_LOCAL_OPENER = build_opener(ProxyHandler({}))
+
+
 def _get_json(url: str) -> dict[str, object]:
-    with urlopen(url, timeout=5) as response:
+    with _LOCAL_OPENER.open(url, timeout=5) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
 def _get_text(url: str) -> str:
-    with urlopen(url, timeout=5) as response:
+    with _LOCAL_OPENER.open(url, timeout=5) as response:
         return response.read().decode("utf-8")
+
+
+def _post_json(url: str, payload: dict[str, object]) -> dict[str, object]:
+    data = json.dumps(payload).encode("utf-8")
+    request = Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+    with _LOCAL_OPENER.open(request, timeout=5) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 
 def test_demo_plan_summary_exposes_closed_loop_production_contract():
@@ -85,6 +95,36 @@ def test_http_server_serves_operable_studio_dashboard_and_status_apis():
     assert "Stage Index" in dashboard
     assert "Shot Workbench" in dashboard
     assert studio["summary"]["project"]["title"] == "Neon Trial"
-    assert studio["stages"][0]["id"] == "script_breakdown"
-    assert any(stage["id"] == "final_export" for stage in studio["stages"])
+    assert studio["all_stages_done"] is True
+    assert studio["stages"][0]["id"] == "runtime_adapter"
+    assert studio["stages"][-1]["id"] == "film_state_engine"
+    assert studio["workflow_stages"][0]["id"] == "script_breakdown"
+    assert any(stage["id"] == "final_export" for stage in studio["workflow_stages"])
     assert jellyfish["upstream_url"] == "https://github.com/Forget-C/Jellyfish"
+
+
+def test_http_server_serves_text_to_drama_run_api():
+    server = create_server("127.0.0.1", 0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address[:2]
+    base_url = f"http://{host}:{port}"
+    try:
+        result = _post_json(
+            f"{base_url}/api/text-to-drama/run",
+            {
+                "source_text": "Ari protects a neon city after finding a key.",
+                "title": "Neon Trial",
+                "persist": False,
+                "max_chapters": 1,
+                "shots_per_chapter": 1,
+            },
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert result["status"] == "completed"
+    assert result["artifacts"]["novel_plan"]["chapters"]
+    assert result["artifacts"]["video_plans"][0]["render_requests"]

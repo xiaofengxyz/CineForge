@@ -1,7 +1,24 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 
-const backendBaseUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? `${backendBaseUrl}/api`
+declare global {
+  interface Window {
+    __ENV?: {
+      BACKEND_URL?: string
+    }
+  }
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
+const runtimeBackendUrl =
+  typeof window !== 'undefined' ? window.__ENV?.BACKEND_URL?.trim() : undefined
+const buildtimeBackendUrl = import.meta.env.VITE_BACKEND_URL?.trim()
+const backendBaseUrl = trimTrailingSlash(runtimeBackendUrl || buildtimeBackendUrl || 'http://localhost:8000')
+const baseURL = import.meta.env.VITE_API_BASE_URL?.trim() || `${backendBaseUrl}/api`
+
+export const apiBaseURL = baseURL
 
 const http: AxiosInstance = axios.create({
   baseURL,
@@ -33,6 +50,9 @@ export const post = <T = unknown>(url: string, data?: unknown, config?: AxiosReq
 
 export const put = <T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> =>
   http.put<T>(url, data, config) as Promise<T>
+
+export const patch = <T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> =>
+  http.patch<T>(url, data, config) as Promise<T>
 
 export const del = <T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> =>
   http.delete<T>(url, config) as Promise<T>

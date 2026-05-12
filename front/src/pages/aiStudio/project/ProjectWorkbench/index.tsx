@@ -6,6 +6,7 @@ import {
   EllipsisOutlined,
   ArrowLeftOutlined,
   VideoCameraFilled,
+  ClusterOutlined,
 } from '@ant-design/icons'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { TAB_CONFIG, type TabKey, isTabKey, DEFAULT_TAB } from './constants'
@@ -18,6 +19,7 @@ import { CostumesTab, PropsTab } from './tabs/PropsTab'
 import { FilesTab } from './tabs/FilesTab'
 import { EditTab } from './tabs/EditTab'
 import { SettingsTab } from './tabs/SettingsTab'
+import FilmEngineDashboard from '../../filmEngine/FilmEngineDashboard'
 import { getChapterShotsPath, getChapterStudioPath, getProjectEditorPath } from './routes'
 import { useProject, useChapters } from './hooks/useProjectData'
 import { ensureHasShotsBeforeShooting } from './ensureHasShotsBeforeShooting'
@@ -205,6 +207,12 @@ const ProjectWorkbench: React.FC = () => {
           />
           <Space size="small" wrap className="shrink-0">
             <Button
+              icon={<ClusterOutlined />}
+              onClick={() => setTabInUrl('film-engine')}
+            >
+              Film Engine
+            </Button>
+            <Button
               type="primary"
               icon={primaryCta.icon}
               onClick={primaryCta.onClick}
@@ -238,6 +246,7 @@ const ProjectWorkbench: React.FC = () => {
         {activeTab === 'props' && <PropsTab />}
         {activeTab === 'costumes' && <CostumesTab />}
         {activeTab === 'files' && <FilesTab />}
+        {activeTab === 'film-engine' && <FilmEngineDashboard embedded projectId={projectId} />}
         {activeTab === 'edit' && <EditTab />}
         {activeTab === 'settings' && <SettingsTab />}
       </div>

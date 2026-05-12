@@ -1,6 +1,7 @@
-import { Card, Button, Statistic, Row, Col, Progress, Space, Spin } from 'antd'
+import { Card, Button, Statistic, Row, Col, Progress, Space, Spin, Tag } from 'antd'
 import {
   CheckCircleOutlined,
+  ClusterOutlined,
   ClockCircleOutlined,
   FileSearchOutlined,
   VideoCameraOutlined,
@@ -18,6 +19,7 @@ import {
   type ChapterFlowStats,
   type ProjectFlowStats,
 } from '../projectFlowStats'
+import { getFilmEngineStageIndex, type FilmEngineStageIndex } from '../../../../../services/filmEngine'
 
 export function DashboardTab({ onSelectTab }: { onSelectTab: (tab: TabKey) => void }) {
   const navigate = useNavigate()
@@ -32,6 +34,8 @@ export function DashboardTab({ onSelectTab }: { onSelectTab: (tab: TabKey) => vo
   })
   const [chapterFlowStats, setChapterFlowStats] = useState<ChapterFlowStats[]>([])
   const [flowStatsLoading, setFlowStatsLoading] = useState(false)
+  const [filmEngineStatus, setFilmEngineStatus] = useState<FilmEngineStageIndex | null>(null)
+  const [filmEngineLoading, setFilmEngineLoading] = useState(false)
 
   const loading = projectLoading || chaptersLoading
   const chaptersByIndex = [...chapters].sort((a, b) => a.index - b.index)
@@ -89,6 +93,36 @@ export function DashboardTab({ onSelectTab }: { onSelectTab: (tab: TabKey) => vo
     }
   }, [chapters, projectId])
 
+  useEffect(() => {
+    let cancelled = false
+    if (!projectId) {
+      setFilmEngineStatus(null)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const run = async () => {
+      setFilmEngineLoading(true)
+      try {
+        const status = await getFilmEngineStageIndex({
+          projectId,
+          chapterId: recommendedChapter?.id,
+        })
+        if (!cancelled) setFilmEngineStatus(status)
+      } catch {
+        if (!cancelled) setFilmEngineStatus(null)
+      } finally {
+        if (!cancelled) setFilmEngineLoading(false)
+      }
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, recommendedChapter?.id])
+
   if (loading && !project) {
     return (
       <div className="flex justify-center items-center py-16">
@@ -109,6 +143,11 @@ export function DashboardTab({ onSelectTab }: { onSelectTab: (tab: TabKey) => vo
   const topPendingChapter = [...chapterFlowStats].sort((a, b) => b.pendingConfirmShots - a.pendingConfirmShots)[0]
   const topGeneratingChapter = [...chapterFlowStats].sort((a, b) => b.generatingShots - a.generatingShots)[0]
   const topReadyChapter = [...chapterFlowStats].sort((a, b) => b.readyShots - a.readyShots)[0]
+  const filmEngineDoneCount = filmEngineStatus?.stages.filter((stage) => stage.status === 'done').length ?? 0
+  const filmEngineTotal = filmEngineStatus?.stages.length ?? 9
+  const filmEngineWorkflowDone = filmEngineStatus?.workflow_stages.filter((stage) => stage.status === 'done').length ?? 0
+  const filmEngineWorkflowTotal = filmEngineStatus?.workflow_stages.length ?? 9
+  const filmEngineNextAction = filmEngineStatus?.summary.metadata.next_action
 
   const handleRecommendedAction = () => {
     if (!projectId) return
@@ -189,6 +228,38 @@ export function DashboardTab({ onSelectTab }: { onSelectTab: (tab: TabKey) => vo
               onClick={handleRecommendedAction}
             >
               {recommendedChapter && recommendedState ? recommendedState.primaryAction : '创建第一章'}
+            </Button>
+          </Space>
+        </div>
+      </Card>
+
+      <Card size="small" loading={filmEngineLoading}>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 font-medium">
+              <ClusterOutlined />
+              Film Engine 闭环
+              <Tag color={filmEngineStatus?.all_stages_done ? 'success' : 'warning'} className="mr-0">
+                九阶段 {filmEngineDoneCount}/{filmEngineTotal}
+              </Tag>
+              <Tag color={filmEngineWorkflowDone === filmEngineWorkflowTotal ? 'success' : 'processing'} className="mr-0">
+                生产闭环 {filmEngineWorkflowDone}/{filmEngineWorkflowTotal}
+              </Tag>
+            </div>
+            <div className="mt-1 text-xs text-gray-500">
+              {filmEngineNextAction?.hint ?? '已接入项目上下文，可统一配置运行时、QA、Retry，并跳转到下一步生成流程。'}
+            </div>
+            <Progress
+              percent={filmEngineTotal ? Math.round((filmEngineDoneCount / filmEngineTotal) * 100) : 0}
+              showInfo={false}
+              size="small"
+              className="mt-2 max-w-xl"
+            />
+          </div>
+          <Space wrap>
+            <Button onClick={() => onSelectTab('film-engine')}>配置 Film Engine</Button>
+            <Button type="primary" icon={<ClusterOutlined />} onClick={() => onSelectTab('film-engine')}>
+              查看九阶段
             </Button>
           </Space>
         </div>

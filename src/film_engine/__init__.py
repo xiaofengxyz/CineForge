@@ -40,6 +40,16 @@ from .core import (
     WorkflowNode,
 )
 from .jellyfish_base import JellyfishBaseStatus, inspect_jellyfish_base
+from .model_adapters import (
+    DeterministicModelAdapter,
+    ModelEndpointConfig,
+    ModelInvocation,
+    ModelInvocationResult,
+    OpenAICompatibleTextAdapter,
+    PreparedModelCall,
+    RuntimeAdapterLayer,
+    RuntimeModelProfiles,
+)
 from .platform import StudioPlatformBridge
 from .post_production import (
     DialogueCue,
@@ -52,6 +62,16 @@ from .post_production import (
     SubtitleCompiler,
 )
 from .records import JellyfishRecordMapper, JellyfishShotBundle
+from .text_to_drama import TextToDramaConfig, TextToDramaPipeline, load_text_to_drama_state
+from .workflow_control import (
+    CINEFORGE_PROMPT_WORKFLOW,
+    StageExecutionRecord,
+    StageSwitch,
+    WorkflowControlConfig,
+    WorkflowExecutionState,
+    WorkflowPromptStage,
+    WorkflowStageGate,
+)
 
 __all__ = [
     "JELLYFISH_FILM_WORKFLOW",
@@ -60,6 +80,8 @@ __all__ = [
     "ClosedLoopProductionPlanner",
     "CompiledPrompt",
     "Component",
+    "CINEFORGE_PROMPT_WORKFLOW",
+    "DeterministicModelAdapter",
     "DialogueCue",
     "DialogueNormalizer",
     "DirectorConsistencyEngine",
@@ -71,6 +93,11 @@ __all__ = [
     "JellyfishBaseStatus",
     "JellyfishRecordMapper",
     "JellyfishShotBundle",
+    "ModelEndpointConfig",
+    "ModelInvocation",
+    "ModelInvocationResult",
+    "OpenAICompatibleTextAdapter",
+    "PreparedModelCall",
     "PostProductionClip",
     "PostProductionPlan",
     "PostProductionPlanner",
@@ -85,9 +112,13 @@ __all__ = [
     "RetryRequest",
     "RuleIssue",
     "RuleResult",
+    "RuntimeAdapterLayer",
+    "RuntimeModelProfiles",
     "SceneBible",
     "ShotContinuityState",
     "ShotPlan",
+    "StageExecutionRecord",
+    "StageSwitch",
     "StudioAsset",
     "StudioChapter",
     "StudioPlatformBridge",
@@ -95,7 +126,14 @@ __all__ = [
     "StudioShot",
     "StudioTask",
     "SubtitleCompiler",
+    "TextToDramaConfig",
+    "TextToDramaPipeline",
+    "WorkflowControlConfig",
+    "WorkflowExecutionState",
     "WorkflowGraph",
     "WorkflowNode",
+    "WorkflowPromptStage",
+    "WorkflowStageGate",
     "inspect_jellyfish_base",
+    "load_text_to_drama_state",
 ]
