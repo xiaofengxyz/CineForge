@@ -15,6 +15,7 @@ from app.models.studio import (
     CharacterImage,
     FileItem,
     FileType,
+    FileUsage,
     Project,
     ProjectStyle,
     ProjectVisualStyle,
@@ -36,6 +37,7 @@ from app.services.film.engine_state import (
     get_project_film_engine_config,
     update_project_film_engine_config,
 )
+from app.services.film.stock_assets import StockMediaItem, collect_stock_assets
 from app.services.film.visual_qa import VisualQAEvaluation
 
 
@@ -113,6 +115,52 @@ def test_text_to_drama_plan_endpoint_returns_executable_plan_without_secret_leak
     assert data["workflow_control"]["done_count"] == 9
 
 
+def test_stock_asset_collect_endpoint_returns_preview_items_without_persisting(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_collect(self: object, *, query: str, image_count: int, video_count: int) -> list[StockMediaItem]:
+        """Return deterministic media so the API test never depends on the network."""
+        assert query == "neon alley"
+        assert image_count == 1
+        assert video_count == 1
+        return [
+            StockMediaItem(
+                id="image-1",
+                media_type="image",
+                title="Neon image",
+                provider="wikimedia_commons",
+                source_url="https://example.test/neon.jpg",
+                thumbnail_url="https://example.test/neon-thumb.jpg",
+                license_page_url="https://commons.wikimedia.org/wiki/File:Neon.jpg",
+            ),
+            StockMediaItem(
+                id="video-1",
+                media_type="video",
+                title="Neon video",
+                provider="wikimedia_commons",
+                source_url="https://example.test/neon.webm",
+                thumbnail_url="https://example.test/neon-video-thumb.jpg",
+                license_page_url="https://commons.wikimedia.org/wiki/File:Neon.webm",
+            ),
+        ]
+
+    monkeypatch.setattr("app.services.film.stock_assets.CommonsStockMediaClient.collect", fake_collect)
+
+    response = client.post(
+        "/api/v1/film/engine/stock-assets/collect",
+        json={"query": "neon alley", "image_count": 1, "video_count": 1, "persist": False},
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["persisted"] is False
+    assert data["item_count"] == 2
+    assert data["items"][0]["file_id"].startswith("stock_")
+    assert data["items"][1]["media_type"] == "video"
+    assert data["sources"][0]["name"] == "Wikimedia Commons"
+
+
 @pytest.mark.asyncio
 async def test_project_film_engine_config_is_persisted_in_project_stats() -> None:
     db, engine = await _build_session()
@@ -147,6 +195,94 @@ async def test_project_film_engine_config_is_persisted_in_project_stats() -> Non
         assert updated.runtime_model == "veo-3"
         assert project.stats["film_engine_config"]["reference_mode"] == "text_only"
         assert project.stats["film_engine_config"]["qa_threshold"] == 0.8
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_stock_asset_collection_persists_project_files_idempotently() -> None:
+    class FakeStockClient:
+        async def collect(self, *, query: str, image_count: int, video_count: int) -> list[StockMediaItem]:
+            """Return stable stock results and assert chapter text produced the query."""
+            assert "霓虹街巷" in query
+            assert image_count == 1
+            assert video_count == 1
+            return [
+                StockMediaItem(
+                    id="commons-image",
+                    media_type="image",
+                    title="霓虹街巷参考图",
+                    provider="wikimedia_commons",
+                    source_url="https://example.test/stock/neon.jpg",
+                    thumbnail_url="https://example.test/stock/neon-thumb.jpg",
+                    license_page_url="https://commons.wikimedia.org/wiki/File:Neon.jpg",
+                    tags=["stock", "image"],
+                ),
+                StockMediaItem(
+                    id="commons-video",
+                    media_type="video",
+                    title="霓虹街巷动态参考",
+                    provider="wikimedia_commons",
+                    source_url="https://example.test/stock/neon.webm",
+                    thumbnail_url="https://example.test/stock/neon-video-thumb.jpg",
+                    license_page_url="https://commons.wikimedia.org/wiki/File:Neon.webm",
+                    tags=["stock", "video"],
+                ),
+            ]
+
+    db, engine = await _build_session()
+    async with db:
+        project = Project(
+            id="film-project",
+            name="漫剧项目",
+            description="雨夜追逐",
+            style=ProjectStyle.guoman,
+            visual_style=ProjectVisualStyle.anime,
+            stats={},
+        )
+        chapter = Chapter(
+            id="chapter-1",
+            project_id=project.id,
+            index=1,
+            title="第一章",
+            raw_text="陆远进入霓虹街巷寻找线索。",
+            condensed_text="霓虹街巷追逐。",
+        )
+        db.add_all([project, chapter])
+        await db.commit()
+
+        first = await collect_stock_assets(
+            db,
+            project_id=project.id,
+            chapter_id=chapter.id,
+            query=None,
+            image_count=1,
+            video_count=1,
+            persist=True,
+            client=FakeStockClient(),
+        )
+        second = await collect_stock_assets(
+            db,
+            project_id=project.id,
+            chapter_id=chapter.id,
+            query=None,
+            image_count=1,
+            video_count=1,
+            persist=True,
+            client=FakeStockClient(),
+        )
+
+        files = (await db.execute(select(FileItem).order_by(FileItem.id))).scalars().all()
+        usages = (await db.execute(select(FileUsage).order_by(FileUsage.file_id))).scalars().all()
+
+        assert first["persisted"] is True
+        assert first["created_file_count"] == 2
+        assert second["created_file_count"] == 0
+        assert len(files) == 2
+        assert {item.type for item in files} == {FileType.image, FileType.video}
+        assert all("film_engine_bootstrap" in item.tags for item in files)
+        assert len(usages) == 2
+        assert {usage.project_id for usage in usages} == {project.id}
+        assert {usage.chapter_id for usage in usages} == {chapter.id}
     await engine.dispose()
 
 

@@ -6,18 +6,17 @@
 
 在 Jellyfish fork 基础上实现工业级 AI 漫剧/电影引擎闭环，覆盖产品设计、架构、代码实现、测试、文档和可运行入口。
 
-本轮补充目标：按 `docs/Codex_Workflow_Prompts` 继续补齐可执行能力，重点落地模型调用适配层隔离、每个 workflow prompt 阶段的自动/人工开关，以及“输入一段文字 → 自动生成小说 → 生成漫剧生产计划”的可操作闭环入口，并同步补齐测试和文档。
+本轮补充目标：按 `docs/Codex_Workflow_Prompts` 继续补齐可执行能力，重点落地“无基础图片/视频资产时可一键从免费图库采集素材”的可运行闭环，并同步补齐后端接口、前端按钮、测试和文档。
 
 ## 本轮执行计划
 
 1. 审阅当前 Film Engine、Jellyfish 接入、workflow prompt 文档、测试和文档，确认本轮新增落点。
-2. 新增模型调用适配层：以 provider/model/base_url/api_key 为配置边界，避免 Film Core 直接耦合具体供应商 SDK。
-3. 新增 workflow prompt 阶段开关：自动阶段继续执行，人工阶段完成后进入 `waiting_for_user` 并阻止后续阶段自动推进。
-4. 新增 text-to-drama 编排器：从用户文本生成 Novel Plan、资产/分镜计划、image/video runtime 请求、QA/Retry 和导出计划。
-5. 将 text-to-drama 入口接入轻量 Film Engine server 和 FastAPI Film Engine API，便于真实调用验证。
-6. 为模型适配层、阶段开关和端到端文本生成漫剧流程补自动化测试。
-7. 更新 `docs/Codex_Workflow_Prompts` 阶段开关说明、实现文档、测试用例文档和用户手册。
-8. 更新任务进度索引并运行定向验证。
+2. 新增 provider-neutral 免费图库采集服务：默认使用 Wikimedia Commons Core REST API，支持图片/视频查询、失败降级、去重和许可证页面追踪。
+3. 新增 Film Engine API：`POST /api/v1/film/engine/stock-assets/collect`，支持项目/章节上下文、非持久预览和持久化为 Jellyfish `FileItem` + `FileUsage`。
+4. 将采集入口接入前端 Film Engine 页面：项目无基础资产或需要补素材时，可点击按钮采集图片/视频并查看结果。
+5. 为采集服务、API、幂等持久化和 UI 类型安全补测试。
+6. 更新实现文档、测试用例文档、用户手册和本任务进度索引。
+7. 启动后端/前端，调用接口和页面入口做运行验证。
 
 ## 当前完成点
 
@@ -54,6 +53,11 @@
 | P28 | Text-to-Drama 编排器 | Done | 新增 `src/film_engine/text_to_drama.py`；输入文本生成 Novel Plan、资产/分镜、runtime 请求、QA/Retry 和导出计划。 |
 | P29 | API/轻量 server 入口 | Done | 新增 `POST /api/v1/film/engine/text-to-drama-plan` 和轻量 server `POST /api/text-to-drama/run`。 |
 | P30 | 本轮测试与文档 | Done | 已补单元/接口测试，更新测试用例、实现文档、用户手册，并完成定向验证。 |
+| P31 | 免费图库采集服务 | Done | 新增 `backend/app/services/film/stock_assets.py`，默认接入 Wikimedia Commons，支持图片/视频、失败降级、去重和许可证页面追踪。 |
+| P32 | 采集 API 与持久化 | Done | 新增 `POST /api/v1/film/engine/stock-assets/collect`，可非持久预览，也可写入 `FileItem` + `FileUsage`。 |
+| P33 | 前端采集按钮 | Done | Film Engine 页面新增 `采集基础素材`，展示缩略图、图片/视频类型、素材源、许可证页和持久化状态。 |
+| P34 | 采集测试与文档 | Done | 已补采集 API、幂等持久化、前端类型检查说明，并更新实现文档、测试用例和用户手册。 |
+| P35 | 本轮运行验证 | Done | 后端/前端已启动验证；`stage-index`、`stock-assets/collect` 和 `/film-engine` 页面入口均可访问。 |
 
 ## 九阶段结论
 
@@ -62,6 +66,7 @@
 - API：`GET /api/v1/film/engine/stage-index`
 - 项目 API：`GET /api/v1/film/engine/stage-index?project_id=...&chapter_id=...`
 - 多集 API：`GET /api/v1/film/engine/series-index?project_id=...`
+- 基础素材采集 API：`POST /api/v1/film/engine/stock-assets/collect`
 - 前端：`http://localhost:7788/film-engine`
 - 项目工作台：`/projects/{projectId}?tab=film-engine&chapter={chapterId}`
 - 分镜列表：章节顶部 `Film Engine` 按钮
@@ -105,8 +110,13 @@
 - 模型适配层：`uv run --project backend python -m pytest --rootdir=/mnt/d/workplace/CineForge -o testpaths= tests/test_model_adapter_layer.py tests/test_workflow_control.py tests/test_text_to_drama_pipeline.py -q -s`，6 passed。
 - Text-to-Drama API：`cd backend && uv run python -m pytest tests/test_film_engine_api.py -q -s`，9 passed。
 - 轻量 server 与既有闭环回归：`uv run --project backend python -m pytest --rootdir=/mnt/d/workplace/CineForge -o testpaths= tests/test_closed_loop_production.py tests/test_luminai_runtime_entrypoint.py tests/test_jellyfish_base_status.py -q -s`，11 passed。
+- 本轮采集 API/Film Engine API：`cd backend && uv run python -m pytest tests/test_film_engine_api.py -q -s`，11 passed。
+- 本轮根级闭环回归：`uv run --project backend python -m pytest --rootdir=/mnt/d/workplace/CineForge -o testpaths= tests/test_model_adapter_layer.py tests/test_workflow_control.py tests/test_text_to_drama_pipeline.py tests/test_closed_loop_production.py tests/test_luminai_runtime_entrypoint.py tests/test_jellyfish_base_status.py -q -s`，17 passed。
+- 本轮前端类型检查：`cd front && ./node_modules/.bin/tsc --noEmit`，passed。
+- 本轮语法检查：`cd backend && uv run python -m compileall app/services/film/stock_assets.py app/api/v1/routes/film/engine.py`，passed。
+- 本轮运行验证：后端 `http://127.0.0.1:8000/health` 返回 ok，前端 `http://127.0.0.1:7788/film-engine` 返回 Vite 页面，`POST /api/v1/film/engine/stock-assets/collect` 返回 2 图 1 视频兜底素材。
 - 空白检查：`git diff --check`，passed。
-- 说明：本轮完成代码级验证，未重新启动 uvicorn/Vite/Celery 长驻服务。
+- 说明：本轮已重新启动 uvicorn 和 Vite 做运行验证；Celery 未启动。
 
 ## 中断恢复流程
 

@@ -67,6 +67,8 @@
   - 验证 `/api/v1/film/engine/stage-index`。
   - 验证 `/api/v1/film/engine/series-index` 的多集聚合服务。
   - 验证 `/api/v1/film/engine/text-to-drama-plan` 可从文字生成可执行生产计划且不泄露密钥。
+  - 验证 `/api/v1/film/engine/stock-assets/collect` 可返回图片/视频预览素材，且测试内不依赖真实网络。
+  - 验证免费图库采集服务可把远程图片/视频幂等写入 `FileItem` + `FileUsage`，再次采集不会重复创建文件。
   - 验证九阶段能力索引为 Runtime Adapter → Film State Engine，且 `all_stages_done=true`。
   - 验证生产闭环 `workflow_stages` 仍保留 script breakdown → final export。
   - 验证项目级 Film Engine 配置会持久化到 `Project.stats.film_engine_config`。
@@ -97,6 +99,7 @@
   - 读取 `/api/v1/film/engine/series-index` 并展示多集生产总览。
   - 带项目上下文时读取 `/api/v1/film/engine/config` 并可保存运行时、参考帧、QA、Retry 配置。
   - 展示九阶段完成度、阶段证据、生产 workflow、render requests、QA reports、retry requests 和 final export。
+  - 支持 `采集基础素材` 按钮，触发 `/api/v1/film/engine/stock-assets/collect` 并展示缩略图、图片/视频类型、素材源和许可证页。
   - 镜头运行计划支持 `Film QA` 按钮，触发 `/api/v1/film/engine/qa/evaluate-shot`。
   - 镜头运行计划支持 `Retry` 按钮，触发 `/api/v1/film/engine/retry-task`。
   - 展示每集镜头数、可规划镜头数、已生成视频数、QA/Retry 数量、九阶段完成度和下一步提示。

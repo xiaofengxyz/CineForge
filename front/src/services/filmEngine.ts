@@ -70,6 +70,36 @@ export type FilmEngineRetryTaskResult = {
   retry_prompt: string
 }
 
+export type FilmEngineStockAsset = {
+  id: string
+  file_id?: string | null
+  media_type: 'image' | 'video' | string
+  title: string
+  provider: string
+  source_url: string
+  thumbnail_url: string
+  license_page_url: string
+  width?: number | null
+  height?: number | null
+  duration?: number | null
+  description?: string
+  tags?: string[]
+}
+
+export type FilmEngineStockAssetCollectResult = {
+  query: string
+  provider: string
+  persisted: boolean
+  created_file_count: number
+  item_count: number
+  items: FilmEngineStockAsset[]
+  sources: Array<{
+    name: string
+    api: string
+    license_note?: string
+  }>
+}
+
 export type FilmEnginePlanSummary = {
   project: { id: string; title: string }
   chapter: { id: string; title: string }
@@ -234,6 +264,26 @@ export async function createFilmEngineRetryTask(params: {
     shot_id: params.shotId,
     chapter_id: params.chapterId,
     ratio: params.ratio,
+  })
+  return response.data
+}
+
+/** Collect free stock image/video references for Film Engine bootstrap assets. */
+export async function collectFilmEngineStockAssets(params: {
+  projectId?: string
+  chapterId?: string
+  query?: string
+  imageCount?: number
+  videoCount?: number
+  persist?: boolean
+}): Promise<FilmEngineStockAssetCollectResult> {
+  const response = await post<ApiResponse<FilmEngineStockAssetCollectResult>>('/v1/film/engine/stock-assets/collect', {
+    project_id: params.projectId,
+    chapter_id: params.chapterId,
+    query: params.query,
+    image_count: params.imageCount ?? 4,
+    video_count: params.videoCount ?? 2,
+    persist: params.persist ?? true,
   })
   return response.data
 }

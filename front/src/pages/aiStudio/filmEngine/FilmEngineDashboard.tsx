@@ -25,18 +25,22 @@ import {
 import {
   CheckCircleOutlined,
   ClusterOutlined,
+  CloudDownloadOutlined,
   ExperimentOutlined,
   FileDoneOutlined,
+  PictureOutlined,
   PlayCircleOutlined,
   ReloadOutlined,
   SaveOutlined,
   SettingOutlined,
+  VideoCameraOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { StudioChaptersService, type ChapterRead } from '../../../services/generated'
 import {
+  collectFilmEngineStockAssets,
   createFilmEngineRetryTask,
   evaluateFilmEngineShotQA,
   getFilmEngineApiBaseURL,
@@ -52,6 +56,8 @@ import {
   type FilmEngineSeriesIndex,
   type FilmEngineStage,
   type FilmEngineStageIndex,
+  type FilmEngineStockAsset,
+  type FilmEngineStockAssetCollectResult,
 } from '../../../services/filmEngine'
 
 const { Text, Paragraph } = Typography
@@ -184,6 +190,8 @@ export default function FilmEngineDashboard({ embedded = false, projectId }: Fil
   const [saving, setSaving] = useState(false)
   const [qaEvaluatingShotId, setQaEvaluatingShotId] = useState<string | null>(null)
   const [retryingShotId, setRetryingShotId] = useState<string | null>(null)
+  const [assetCollecting, setAssetCollecting] = useState(false)
+  const [stockAssetBatch, setStockAssetBatch] = useState<FilmEngineStockAssetCollectResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [form] = Form.useForm<FilmEngineConfig>()
 
@@ -361,6 +369,30 @@ export default function FilmEngineDashboard({ embedded = false, projectId }: Fil
     [data?.chapter.id, load, projectId, selectedChapterId],
   )
 
+  const collectStockAssets = useCallback(async () => {
+    setAssetCollecting(true)
+    try {
+      const result = await collectFilmEngineStockAssets({
+        projectId,
+        chapterId: selectedChapterId || data?.chapter.id,
+        imageCount: 4,
+        videoCount: 2,
+        persist: !!projectId,
+      })
+      setStockAssetBatch(result)
+      message.success(
+        result.persisted
+          ? `已采集 ${result.item_count} 个基础素材，新增 ${result.created_file_count} 个文件`
+          : `已采集 ${result.item_count} 个基础素材`,
+      )
+      if (result.persisted) await load()
+    } catch (err) {
+      message.error(getErrorDescription(err))
+    } finally {
+      setAssetCollecting(false)
+    }
+  }, [data?.chapter.id, load, projectId, selectedChapterId])
+
   const stageColumns: ColumnsType<FilmEngineStage> = useMemo(
     () => [
       {
@@ -499,6 +531,61 @@ export default function FilmEngineDashboard({ embedded = false, projectId }: Fil
     [],
   )
 
+  const stockAssetColumns: ColumnsType<FilmEngineStockAsset> = useMemo(
+    () => [
+      {
+        title: '预览',
+        dataIndex: 'thumbnail_url',
+        width: 110,
+        render: (_, item) => (
+          <a href={item.source_url} target="_blank" rel="noreferrer" className="block">
+            <div className="relative h-[58px] w-[92px] overflow-hidden rounded border border-solid border-gray-200 bg-gray-50">
+              <img src={item.thumbnail_url || item.source_url} alt={item.title} className="h-full w-full object-cover" />
+              {item.media_type === 'video' ? (
+                <VideoCameraOutlined className="absolute bottom-1 right-1 rounded bg-black/60 p-1 text-white" />
+              ) : null}
+            </div>
+          </a>
+        ),
+      },
+      {
+        title: '类型',
+        dataIndex: 'media_type',
+        width: 110,
+        render: (value: string) => (
+          <Tag icon={value === 'video' ? <VideoCameraOutlined /> : <PictureOutlined />} color={value === 'video' ? 'purple' : 'blue'}>
+            {value === 'video' ? '视频' : '图片'}
+          </Tag>
+        ),
+      },
+      {
+        title: '素材',
+        dataIndex: 'title',
+        render: (_, item) => (
+          <Space direction="vertical" size={0} className="min-w-0">
+            <a href={item.source_url} target="_blank" rel="noreferrer">
+              {shorten(item.title, 72)}
+            </a>
+            <Text type="secondary" className="text-xs">
+              {item.file_id ?? item.provider}
+            </Text>
+          </Space>
+        ),
+      },
+      {
+        title: '许可证页',
+        dataIndex: 'license_page_url',
+        width: 160,
+        render: (value: string) => (
+          <a href={value} target="_blank" rel="noreferrer">
+            Commons
+          </a>
+        ),
+      },
+    ],
+    [],
+  )
+
   if (loading && !data) {
     return (
       <div className="h-full overflow-auto p-4">
@@ -528,6 +615,14 @@ export default function FilmEngineDashboard({ embedded = false, projectId }: Fil
               onChange={updateSelectedChapter}
             />
           ) : null}
+          <Button
+            type="primary"
+            icon={<CloudDownloadOutlined />}
+            loading={assetCollecting}
+            onClick={() => void collectStockAssets()}
+          >
+            采集基础素材
+          </Button>
           <Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading}>
             刷新
           </Button>
@@ -587,6 +682,23 @@ export default function FilmEngineDashboard({ embedded = false, projectId }: Fil
               </Card>
             </Col>
           </Row>
+
+          {stockAssetBatch ? (
+            <Card
+              size="small"
+              title={`基础素材采集 · ${shorten(stockAssetBatch.query, 56)}`}
+              extra={<Tag color={stockAssetBatch.persisted ? 'success' : 'default'}>{stockAssetBatch.persisted ? '已写入项目' : '预览'}</Tag>}
+            >
+              <Table
+                rowKey={(item) => item.file_id || item.id}
+                size="small"
+                columns={stockAssetColumns}
+                dataSource={stockAssetBatch.items}
+                pagination={false}
+                scroll={{ x: 720 }}
+              />
+            </Card>
+          ) : null}
 
           {projectId && series ? (
             <Card size="small" title="多集生产总览">

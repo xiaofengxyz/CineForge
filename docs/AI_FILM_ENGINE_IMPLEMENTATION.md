@@ -92,8 +92,10 @@ Novel / Script
 - `src/film_engine/server.py`：无依赖本地运行仪表盘。
 - `backend/app/api/v1/routes/film/engine.py`：FastAPI 下的 Film Engine 入口。
 - `backend/app/services/film/engine_state.py`：从 Jellyfish Project/Chapter/Shot/Scene/Character 数据构建 Film Engine 项目上下文，并持久化项目级运行配置。
+- `backend/app/services/film/stock_assets.py`：免费图库采集服务，默认通过 Wikimedia Commons Core REST API 采集图片/视频引用，支持失败降级和幂等写入 `FileItem`/`FileUsage`。
 - `backend/app/services/film/visual_qa.py`：Film Visual QA 组合评估器，产出 `lighting_similarity`、`face_similarity` 和语义 `clip_score`。
 - `backend/app/services/film/generated_video.py`：视频生成任务完成后，写入 Film Visual QA 证据。
+- `front/src/services/filmEngine.ts`：Film Engine 前端 API 类型与请求封装。
 - `front/src/pages/aiStudio/filmEngine/FilmEngineDashboard.tsx`：项目内 Film Engine 配置、九阶段证据、workflow、QA/Retry 和下一步操作入口。
 
 ## API
@@ -107,6 +109,7 @@ Novel / Script
 - `GET /api/v1/film/engine/config?project_id=...`
 - `PATCH /api/v1/film/engine/config?project_id=...`
 - `POST /api/v1/film/engine/text-to-drama-plan`
+- `POST /api/v1/film/engine/stock-assets/collect`
 - `POST /api/v1/film/engine/qa/evaluate-shot`
 - `POST /api/v1/film/engine/retry-task`
 
@@ -149,6 +152,14 @@ Novel / Script
 - 请求体：`{"project_id":"...","chapter_id":"...","shot_id":"...","ratio":"9:16"}`
 - 行为：读取当前 Film Engine Retry prompt，创建真实 `video_generation` 任务，并关联回该镜头。
 
+`stock-assets/collect` 用于没有基础图片/视频资产时的一键采集：
+
+- 请求体：`{"project_id":"...","chapter_id":"...","query":"neon alley","image_count":4,"video_count":2,"persist":true}`
+- `query` 为空时，服务会从项目名称、项目描述、章节标题和章节文本推导搜索词。
+- 默认图库为 Wikimedia Commons；响应保留 `license_page_url`，方便后续署名和许可证复核。
+- `persist=true` 且提供 `project_id` 时，会把远程图片/视频引用幂等写入 Jellyfish `FileItem`，并用 `FileUsageKind.api` 关联项目/章节。
+- 如果网络不可用或搜索结果不足，服务会返回稳定的 Wikimedia Commons 兜底素材，保证页面按钮不因外部图库短暂失败而阻断流程。
+
 ## 前端可见入口
 
 Jellyfish 主前端已新增：
@@ -158,6 +169,7 @@ Jellyfish 主前端已新增：
 - 项目工作台标签页：`Film Engine`
 - 项目仪表盘摘要卡：展示九阶段证据、生产闭环完成度和下一步提示。
 - 分镜列表按钮：从章节上下文直接进入当前章节 Film Engine 配置。
+- Film Engine 页按钮：`采集基础素材`，可从免费图库补齐项目图片/视频参考。
 
 页面集中展示：
 
@@ -166,6 +178,7 @@ Jellyfish 主前端已新增：
 - 生产闭环 workflow
 - 运行时供应商、模型、参考帧策略、Director DSL 焦段、QA 阈值、Retry 策略等项目级配置
 - render requests、QA reports、retry requests
+- 基础素材采集结果：缩略图、图片/视频类型、素材源、许可证页和持久化状态
 - 镜头运行计划中的 `Film QA` 按钮：对已有生成视频重评估并写回指标。
 - 镜头运行计划中的 `Retry` 按钮：对有 Retry 请求的镜头创建真实二次渲染任务。
 - final editing/export 状态

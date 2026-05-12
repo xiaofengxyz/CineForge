@@ -21,6 +21,7 @@ from app.services.film.engine_state import (
     get_project_film_engine_config,
     update_project_film_engine_config,
 )
+from app.services.film.stock_assets import collect_stock_assets
 
 router = APIRouter(prefix="/engine", tags=["film-engine"])
 
@@ -46,6 +47,17 @@ class FilmEngineTextToDramaPlanRequest(BaseModel):
     source_text: str = Field(..., description="用户输入的一段故事文字")
     title: str = Field("CineForge Auto Drama", description="自动生成小说/漫剧项目标题")
     config: dict[str, Any] = Field(default_factory=dict, description="阶段开关、模型 endpoint 与运行参数")
+
+
+class FilmEngineStockAssetCollectRequest(BaseModel):
+    """Request body for collecting free image/video bootstrap assets."""
+
+    project_id: str | None = Field(None, description="项目 ID；提供后可持久化素材引用")
+    chapter_id: str | None = Field(None, description="章节 ID；提供后用于推导搜索词并写入使用范围")
+    query: str | None = Field(None, description="可选搜索词；为空时从项目/章节上下文推导")
+    image_count: int = Field(4, ge=0, le=12, description="采集图片数量")
+    video_count: int = Field(2, ge=0, le=6, description="采集视频数量")
+    persist: bool = Field(True, description="是否写入 Jellyfish FileItem/FileUsage")
 
 
 def _ensure_repo_root_on_path() -> None:
@@ -135,6 +147,30 @@ async def create_text_to_drama_plan(
         body.source_text,
         config=TextToDramaConfig.from_mapping(config_payload),
     )
+    return success_response(result)
+
+
+@router.post(
+    "/stock-assets/collect",
+    response_model=ApiResponse[dict[str, Any]],
+    summary="从免费图库采集 Film Engine 基础图片/视频素材",
+)
+async def collect_film_engine_stock_assets(
+    body: FilmEngineStockAssetCollectRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[dict[str, Any]]:
+    """Collect remote stock references and optionally persist them for a project."""
+    result = await collect_stock_assets(
+        db,
+        project_id=body.project_id,
+        chapter_id=body.chapter_id,
+        query=body.query,
+        image_count=body.image_count,
+        video_count=body.video_count,
+        persist=body.persist,
+    )
+    if result["persisted"]:
+        await db.commit()
     return success_response(result)
 
 
