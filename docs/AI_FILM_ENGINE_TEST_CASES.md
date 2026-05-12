@@ -107,6 +107,24 @@
   - 项目工作台和分镜列表均能进入带 chapter 上下文的 Film Engine 页面。
   - 通过 `front` TypeScript 检查覆盖接口类型、路由和页面编译。
 
+## 服务恢复与现场验收
+
+- 重启后端口恢复
+  - 验证 `7788/8000` 初始无监听时，`/film-engine` 打不开的直接原因是服务未启动。
+  - 验证 `uvicorn app.main:app --host 0.0.0.0 --port 8000` 可恢复后端。
+  - 验证 `vite --host 0.0.0.0 --port 7788` 可恢复前端。
+
+- 现场 API 验收
+  - 验证 `GET /health` 返回 `status=ok`。
+  - 验证 `GET /api/v1/film/engine/stage-index` 返回 `code=200` 且 `all_stages_done=true`。
+  - 验证 `POST /api/v1/film/engine/stock-assets/collect` 在 `persist=false` 时返回图片/视频线上素材引用，不写入项目数据库。
+  - 验证采集结果包含 `source_url`、`thumbnail_url`、`license_page_url` 和 `media_type`，前端可用于缩略图、素材跳转和授权复核。
+
+- 现场前端验收
+  - 验证 `GET http://127.0.0.1:7788/film-engine` 返回 Vite SPA 页面。
+  - 验证页面已包含 Film Engine 路由入口，运行时通过 `env.js` 指向 `http://localhost:8000/api`。
+  - 验证 `采集基础素材` 按钮对应前端服务 `collectFilmEngineStockAssets`，请求 `/api/v1/film/engine/stock-assets/collect`。
+
 ## 本轮验证命令
 
 ```bash
@@ -115,14 +133,24 @@ uv run python -m pytest tests/test_visual_qa.py tests/test_film_engine_api.py -q
 ```
 
 ```bash
-uv run --project backend python -m pytest --rootdir=/mnt/d/workplace/CineForge -o testpaths= tests/test_closed_loop_production.py -q -s
+uv run --project backend python -m pytest --rootdir=/mnt/d/workplace/CineForge -o testpaths= tests/test_model_adapter_layer.py tests/test_workflow_control.py tests/test_text_to_drama_pipeline.py tests/test_closed_loop_production.py tests/test_luminai_runtime_entrypoint.py tests/test_jellyfish_base_status.py -q -s
 ```
 
 ```bash
-uv run --project backend python -m pytest --rootdir=/mnt/d/workplace/CineForge -o testpaths= tests/test_model_adapter_layer.py tests/test_workflow_control.py tests/test_text_to_drama_pipeline.py tests/test_luminai_runtime_entrypoint.py -q -s
+cd backend
+uv run python -m compileall app/services/film/stock_assets.py app/api/v1/routes/film/engine.py
 ```
 
 ```bash
 cd front
 ./node_modules/.bin/tsc --noEmit
+```
+
+```bash
+curl --noproxy '*' -sSf http://127.0.0.1:8000/health
+curl --noproxy '*' -sSf http://127.0.0.1:8000/api/v1/film/engine/stage-index
+curl --noproxy '*' -sSf http://127.0.0.1:7788/film-engine
+curl --noproxy '*' -sSf -X POST http://127.0.0.1:8000/api/v1/film/engine/stock-assets/collect \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"cinematic city night drama","image_count":2,"video_count":1,"persist":false}'
 ```

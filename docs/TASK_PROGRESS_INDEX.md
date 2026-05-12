@@ -58,6 +58,7 @@
 | P33 | 前端采集按钮 | Done | Film Engine 页面新增 `采集基础素材`，展示缩略图、图片/视频类型、素材源、许可证页和持久化状态。 |
 | P34 | 采集测试与文档 | Done | 已补采集 API、幂等持久化、前端类型检查说明，并更新实现文档、测试用例和用户手册。 |
 | P35 | 本轮运行验证 | Done | 后端/前端已启动验证；`stage-index`、`stock-assets/collect` 和 `/film-engine` 页面入口均可访问。 |
+| P36 | 重启后服务恢复验证 | Done | 2026-05-12 重启后确认 7788/8000 未监听，已重新启动 uvicorn 与 Vite；`/film-engine`、`stage-index`、免费素材采集 API 和定向测试均通过。 |
 
 ## 九阶段结论
 
@@ -115,6 +116,15 @@
 - 本轮前端类型检查：`cd front && ./node_modules/.bin/tsc --noEmit`，passed。
 - 本轮语法检查：`cd backend && uv run python -m compileall app/services/film/stock_assets.py app/api/v1/routes/film/engine.py`，passed。
 - 本轮运行验证：后端 `http://127.0.0.1:8000/health` 返回 ok，前端 `http://127.0.0.1:7788/film-engine` 返回 Vite 页面，`POST /api/v1/film/engine/stock-assets/collect` 返回 2 图 1 视频兜底素材。
+- 重启后端口核验：`ss -ltnp | rg ':(7788|8000)\b' || true` 初始无监听，问题原因是电脑重启后服务未恢复。
+- 重启后服务恢复：`cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000` 与 `cd front && ./node_modules/.bin/vite --host 0.0.0.0 --port 7788` 均已启动。
+- 重启后现场 API 验收：`curl --noproxy '*' -sSf http://127.0.0.1:8000/health` 返回 `status=ok`；`GET /api/v1/film/engine/stage-index` 返回 `code=200` 且 `all_stages_done=true`。
+- 重启后前端验收：`curl --noproxy '*' -sSf http://127.0.0.1:7788/film-engine` 返回 Vite SPA 页面，可直接打开 `http://127.0.0.1:7788/film-engine`。
+- 重启后素材采集验收：`POST /api/v1/film/engine/stock-assets/collect` 使用 `persist=false,image_count=2,video_count=1` 返回 3 个 Wikimedia Commons 线上素材引用，含图片、视频、缩略图和许可证页。
+- 重启后后端 Film Engine/Visual QA 定向测试：`cd backend && uv run python -m pytest tests/test_visual_qa.py tests/test_film_engine_api.py -q -s`，14 passed。
+- 重启后根级 Film Engine 闭环回归：`uv run --project backend python -m pytest --rootdir=/mnt/d/workplace/CineForge -o testpaths= tests/test_model_adapter_layer.py tests/test_workflow_control.py tests/test_text_to_drama_pipeline.py tests/test_closed_loop_production.py tests/test_luminai_runtime_entrypoint.py tests/test_jellyfish_base_status.py -q -s`，17 passed。
+- 重启后前端类型检查：`cd front && ./node_modules/.bin/tsc --noEmit`，passed。
+- 重启后语法检查：`cd backend && uv run python -m compileall app/services/film/stock_assets.py app/api/v1/routes/film/engine.py`，passed。
 - 空白检查：`git diff --check`，passed。
 - 说明：本轮已重新启动 uvicorn 和 Vite 做运行验证；Celery 未启动。
 
@@ -122,7 +132,7 @@
 
 1. 运行 `git status --short`，确认用户已有改动，不回退。
 2. 后端：`cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000`。
-3. 前端：`cd front && ./node_modules/.bin/vite --host 0.0.0.0`。
+3. 前端：`cd front && ./node_modules/.bin/vite --host 0.0.0.0 --port 7788`。
 4. 验证 API：`curl --noproxy '*' -sSf http://127.0.0.1:8000/api/v1/film/engine/stage-index`。
 5. 验证前端：
    - 全局验收页：打开 `http://localhost:7788/film-engine`。
